@@ -1,0 +1,74 @@
+version: "3.2"
+services:
+  frontend: 
+    build:
+      context: ./react-app
+      dockerfile: Dockerfile
+    volumes:
+      - ./react-app:/app
+    ports:
+      - 3000:3000
+  backend:
+    build:
+      context: ./flask-app
+      dockerfile: Dockerfile
+    command: flask run --host=0.0.0.0
+    #prod command
+    # command: gunicorn --bind 0.0.0.0:8080 "printing_backend:create_app()"
+    volumes:
+      - ./flask-app:/srv/app
+      # - $PWD:/srv/app
+    stdin_open: true
+    tty: true
+    ports:
+      - 8080:8080
+
+    user: ${CURRENT_UID}
+    container_name: flask_backend
+    environment:
+      DB_HOST: mongo
+      DB_USER: colab
+      DB_PASSWORD: example
+      DB_AUTH_SOURCE: development
+      FRONTEND_OAUTH_REDIRECT_URI: http://localhost:3000/oauth/consume
+      FLASK_APP: printing_backend
+      FLASK_ENV: development
+      FLASK_KEY: dev
+      FLASK_RUN_PORT: 8080
+      OAUTH_CLIENT_ID: ${PRINT_OAUTH_ID}
+      OAUTH_CLIENT_SECRET: ${PRINT_OAUTH_SECRET}
+      PRINT_API_HOST: https://duke.3dprinteros.com
+      PRINT_API_USERNAME: ${PRINT_API_USERNAME}
+      PRINT_API_PASSWORD: ${PRINT_API_PASSWORD}
+      PRINT_SCHEDULER_USER: local_user
+      PRINT_SCHEDULER_PASSWORD: local_password
+     
+      
+
+  # #note this wont work with a volume so need to rebuild after any scheduler changes
+  python_scheduler:
+    build:
+      context: ./flask-app/scheduler
+    command: /usr/bin/supervisord
+    container_name: python_scheduler
+    volumes:
+      - ./logs:/srv/scheduler/logs
+    environment:
+      APP_ENVIRONMENT: development
+      PRINT_BACKEND_HOST: http://app:8080
+      PRINT_SCHEDULER_USER: local_user
+      PRINT_SCHEDULER_PASSWORD: local_password
+
+
+
+  mongo:
+    image: mongo
+    # user: ${CURRENT_UID}
+    restart: always
+    volumes:
+      - ./mongo_data:/data/db
+    ports: 
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
